@@ -1,11 +1,13 @@
-﻿using HeartBeatFunctionApp.Helper;
+﻿using Azure;
+using Azure.Messaging.EventGrid;
+using HeartBeatFunctionApp.Helper;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text.Json;
 
-namespace HeartBeatFunctionApp;
+namespace HeartBeatFunctionApp.Triggers;
 
 public class HeartbeatHttp
 {
@@ -40,7 +42,7 @@ public class HeartbeatHttp
         _lastHeartbeat = DateTime.UtcNow;
         _logger.LogInformation("HTTP heartbeat recorded at {time}", _lastHeartbeat);
 
-        // queue message
+        // Queue - Blob
         var message = $"Heartbeat recorded at {_lastHeartbeat:o}";
         var blobJson = JsonSerializer.Serialize(new
         {
@@ -48,8 +50,52 @@ public class HeartbeatHttp
             source = "HTTP"
         });
 
+        // Publish event to Event Grid
+        try
+        {
+            string? topicEndpoint = Environment.GetEnvironmentVariable("EventGridTopicEndpoint");
+            string? topicKey = Environment.GetEnvironmentVariable("EventGridAccessKey");
+
+            if (string.IsNullOrEmpty(topicEndpoint) || string.IsNullOrEmpty(topicKey))
+            {
+                throw new InvalidOperationException("Event Grid configuration is missing.");
+            }
+
+            var credentials = new AzureKeyCredential(topicKey);
+            var client = new EventGridPublisherClient(new Uri(topicEndpoint), credentials);
+
+            var eventPayload = new EventGridEvent(
+                subject: "heartbeat/new",
+                eventType: "HeartbeatRecorded",
+                dataVersion: "1.0",
+                data: new { timestamp = _lastHeartbeat, source = "HeartbeatHttp" }
+            );
+
+            await client.SendEventAsync(eventPayload);
+            _logger.LogInformation("Event Grid event published successfully.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to publish Event Grid event.");
+        }
+
+        //string topicEndpoint = Environment.GetEnvironmentVariable("EventGridTopicEndpoint")!;
+        //string topicKey = Environment.GetEnvironmentVariable("EventGridAccessKey")!;
+
+        //var credentials = new AzureKeyCredential(topicKey);
+        //var client = new EventGridPublisherClient(new Uri(topicEndpoint), credentials);
+
+        //var eventPayload = new EventGridEvent(
+        //    subject: "heartbeat/new",
+        //    eventType: "HeartbeatRecorded",
+        //    dataVersion: "1.0",
+        //    data: new { timestamp = _lastHeartbeat, source = "HeartbeatHttp" }
+        //);
+
+        //await client.SendEventAsync(eventPayload);
+
         var created = req.CreateResponse(HttpStatusCode.Created);
-        await created.WriteStringAsync("Heartbeat recorded and queued.");
+        await created.WriteStringAsync("Heartbeat recorded, queued and published to Event Grid.");
 
         return new HeartbeatResponse
         {
@@ -58,7 +104,6 @@ public class HeartbeatHttp
             HttpResponse = created
         };
     }
-
 
     //[Function("HeartbeatHttp")]
     //public async Task<HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = "heartbeat")] HttpRequestData req)

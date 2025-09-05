@@ -4,7 +4,7 @@ using SendGrid;
 using SendGrid.Helpers.Mail;
 using System;
 
-namespace HeartBeatFunctionApp;
+namespace HeartBeatFunctionApp.Triggers;
 
 public class TimerHeartbeat
 {
@@ -22,7 +22,7 @@ public class TimerHeartbeat
     /// </summary>
     /// <param name="myTimer"></param>
     [Function("TimerHeartbeat")]
-    public async Task Run([TimerTrigger("*/30 * * * * *")] TimerInfo myTimer)
+    public async Task Run([TimerTrigger("0 */30 * * * *")] TimerInfo myTimer)
     {
         var timestamp = DateTime.UtcNow.ToString("u");
         _logger.LogInformation("Timer heartbeat recorded at: {time}", timestamp);

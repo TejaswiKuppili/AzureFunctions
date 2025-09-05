@@ -5,7 +5,7 @@ using SendGrid;
 using SendGrid.Helpers.Mail;
 using System;
 
-namespace HeartBeatFunctionApp;
+namespace HeartBeatFunctionApp.Triggers;
 
 public class HeartbeatQueueProcessor
 {
