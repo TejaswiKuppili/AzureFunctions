@@ -1,4 +1,9 @@
-﻿using Azure.Storage.Blobs;
+﻿//Have to comment the Blob Trigger to avoid duplicate processing as this branch
+//implements Durable orchestration functions on top of Blob trigger
+ 
+
+
+using Azure.Storage.Blobs;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using System.IO;
